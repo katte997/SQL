@@ -1,0 +1,94 @@
+---1. 5 najdłużej pracujących pracowników 
+SELECT TOP 5 P.FirstName+' '+P.LastName AS Employee, E.JobTitle, E.HireDate
+FROM HumanResources.Employee AS E
+JOIN Person.Person AS P
+ON E.BusinessEntityID = P.BusinessEntityID
+ORDER BY HireDate
+
+
+---2. Różnica pomiędzy najdłużej, a najkrócej pracującym pracownikiem
+SELECT
+DATEDIFF(year,
+(SELECT TOP 1 E.HireDate
+FROM HumanResources.Employee AS E
+ORDER BY HireDate),
+(SELECT TOP 1 E.HireDate
+FROM HumanResources.Employee AS E
+ORDER BY HireDate DESC)) AS Roznica
+
+---3. Podział pozycji ze względu na przypisany departament
+SELECT BusinessEntityID, DepartmentID,
+CASE 
+WHEN DepartmentID >=1 AND DepartmentID<7 THEN'Junior'
+WHEN DepartmentID >=7 AND DepartmentID<11 THEN 'Mid'
+WHEN DepartmentID >=11 THEN 'Senior'
+ELSE '-'
+END
+AS 'Level'
+FROM HumanResources.EmployeeDepartmentHistory
+ORDER BY DepartmentID
+
+---4. Średni czas przebywania na zwolnieniu lekarskim przez pracownika oraz różnica 
+---pomiędzy liczbą godzin na zwolnieniu lekarskim a średnią liczbą godzin wszystkich pracowników
+SELECT E.LoginID, E.SickLeaveHours,
+    (SELECT AVG(SickLeaveHours) 
+	FROM HumanResources.Employee) AS AvgSickLeaveHours,
+    E.SickLeaveHours - (SELECT AVG(SickLeaveHours) FROM HumanResources.Employee) AS SickLeaveDiff
+FROM HumanResources.Employee E
+WHERE E.SickLeaveHours > (SELECT AVG(SickLeaveHours) FROM HumanResources.Employee)
+ORDER  BY SickLeaveDiff DESC
+
+---5. Zatrudnione kobiety, mieszkające w mieście na literę 'K'
+SELECT E.BusinessEntityID,P.FirstName,P.LastName, A.City
+FROM HumanResources.Employee AS E
+LEFT JOIN Person.Person AS P
+ON P.BusinessEntityID=E.BusinessEntityID
+LEFT JOIN Person.BusinessEntityAddress AS BEA
+ON BEA.BusinessEntityID=P.BusinessEntityID
+LEFT JOIN Person.Address AS A
+ON A.AddressID=BEA.AddressID
+WHERE Gender ='F'
+AND A.City LIKE 'K%'
+
+---6.Stanowiska, na których pozostały urlop do wykorzystania jest większy od 500 godzin
+SELECT JobTitle, SUM(VacationHours) AS SumaUrlopu
+FROM HumanResources.Employee
+GROUP BY JobTitle 
+HAVING SUM(VacationHours)>500
+ORDER BY 2 DESC
+
+---7.Sprzedawca, który w zeszłym roku osiągnął najwyższą sprzedaż 
+SELECT*
+FROM (SELECT ROW_NUMBER() OVER(ORDER BY SalesLastYear DESC) AS ranking,
+	BusinessEntityID,LastName,FirstName,ROUND(SalesLastYear,2) AS SalesLastYear
+	FROM Sales.vSalesPerson) AS podzapytanie 
+WHERE ranking=1
+
+
+---8.Średnia sprzedaż w departamecie 3 z podziałem na stanowiska
+SELECT E.JobTitle, AVG(SP.SalesYTD) AS Średnia_sprzedaż
+FROM HumanResources.Employee AS E
+JOIN HumanResources.EmployeeDepartmentHistory AS EDH
+ON EDH.BusinessEntityID=E.BusinessEntityID
+JOIN sales.SalesPerson AS SP
+ON SP.BusinessEntityID=EDH.BusinessEntityID
+WHERE EDH.DepartmentID=3
+GROUP BY E.JobTitle
+
+---9.Kupujący, którzy nie są jednocześnie pracownikami
+SELECT P.LastName+' '+ P.FirstName AS Client
+FROM Person.Person P 
+EXCEPT
+SELECT 
+P.LastName+' '+P.FirstName
+FROM HumanResources.Employee E 
+JOIN Person.Person P ON E.BusinessEntityID = P.BusinessEntityID
+
+---10. Podział pracowników na rangi pod względem stażu pracy
+SELECT P.FirstName, P.LastName,E.HireDate, 
+IIF(DATEDIFF(year, HireDate, GETDATE())>15,'Z_rang',
+IIF(DATEDIFF(year, HireDate, GETDATE())>10,'X_rang','Y_rang')) AS Ranga_pracownika
+FROM HumanResources.Employee AS E
+JOIN Person.Person AS P
+ON E.BusinessEntityID=P.BusinessEntityID
+Order BY Ranga_pracownika
